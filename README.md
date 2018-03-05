@@ -1,6 +1,8 @@
 ### Booklet Writer
 A program that will generate chess book lines automatically using a chess engine by depth-first search algorithm.  
-This is developed under windows 7 OS along with the installation of the items in requirements below.
+This is developed under windows 7 OS along with the installation of the items in requirements below.  
+
+This program is created from an attempt to create a program that will build an opening book based from engine, as described by Uri Blass in CCC at http://talkchess.com/forum/viewtopic.php?t=66680. The target algorightm should have been breadth-first.
 
 ### Requirements
 1. Python 3.x  
