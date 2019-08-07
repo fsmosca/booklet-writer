@@ -1,4 +1,4 @@
-### Booklet Writer
+# Booklet Writer
 A program that will generate chess book lines automatically using a chess engine by depth-first search algorithm.  
 This is developed under windows 7 OS along with the installation of the items in requirements below.  
 
@@ -7,15 +7,15 @@ This program is created from an attempt to create a program that will build an o
 ### Requirements
 1. Python 3.x  
 https://www.python.org/  
-2. Python-chess  
+2. Python-chess v0.23.10  
 https://pypi.python.org/pypi/python-chess  
 2. UCI engine such as Stockfish and others  
 https://stockfishchess.org/
 
 ### Usage
 <pre>
-usage: booklet-writer.py [-h] -e ENGINE [-m HASH] [-t THREADS] [-d DEPTH]
-                         [-a MOVETIME] [-f WMULTIPV] [-g BMULTIPV]
+usage: booklet-writer.py [-h] -e ENGINE --inpgn INPGN [-m HASH] [-t THREADS]
+                         [-d DEPTH] [-a MOVETIME] [-f WMULTIPV] [-g BMULTIPV]
                          [-b BOOKSIDE] [-r RELMINSCORE] [-j MOVEPENALTY]
 
 Generates pgn lines using an engine useful for book creation. It uses depth-
@@ -25,6 +25,7 @@ optional arguments:
   -h, --help            show this help message and exit
   -e ENGINE, --engine ENGINE
                         input engine name
+  --inpgn INPGN         input pgn file
   -m HASH, --hash HASH  engine hash usage in MB, default=64MB
   -t THREADS, --threads THREADS
                         engine threads to use, default=1
@@ -39,7 +40,7 @@ optional arguments:
   -g BMULTIPV, --bmultipv BMULTIPV
                         number of pv for black, default=1
   -b BOOKSIDE, --bookside BOOKSIDE
-                        white = book for white, black = book for black,
+                        white=book for white, black=book for black,
                         default=black
   -r RELMINSCORE, --relminscore RELMINSCORE
                         minimum relative score that a given move will be
@@ -53,7 +54,7 @@ Booklet Writer v0.1.0
 
 To generate a book for black using stockfish engine, you may set black multipv to 1 and white multipv to 4 and movetime of 1000 ms.  
 
-`booklet-writer.py --engine stockfish.exe --hash 128 --threads 1 --movetime 1000 --bmultipv 1 --wmultipv 4 --bookside black`
+`booklet-writer.py --engine stockfish.exe --hash 128 --threads 1 --movetime 1000 --bmultipv 1 --wmultipv 4 --bookside black --inpgn sample.pgn`
 
 ### Output
 The output currently is a pgn file and this is in append mode.
@@ -95,3 +96,8 @@ The output currently is a pgn file and this is in append mode.
 
 1. e4 {rel_score: 0.00, line_score: 0.00} 1... e5 {rel_score: 0.00, line_score: -0.10} 2. Bc4 {rel_score: -0.09, line_score: -0.19} 2... Nf6 {rel_score: 0.00, line_score: -0.29} *
 </pre>
+
+### Credits
+* Python-chess  
+https://github.com/niklasf/python-chess
+
