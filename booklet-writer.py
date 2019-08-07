@@ -12,6 +12,7 @@ import os, sys
 import time
 import chess
 import chess.uci
+import chess.pgn
 import argparse
 import datetime
 
@@ -45,7 +46,6 @@ class genbook():
         self.eng = g['engine']
         self.hash = g['hash']  # in mb
         self.threads = g['threads']
-        self.startpos = g['startpos']
         self.book_side = g['bookside']  # white or black
         self.wmultipv = g['wmultipv']
         self.bmultipv = g['bmultipv']
@@ -57,7 +57,16 @@ class genbook():
         self.pv = []
         self.book_line = 0
         self.analyzer = None
-        self.fmvn = int(self.startpos.split()[5])
+        self.pgnfile = g['pgnfile']
+
+    def get_end_fen(self, pgnfn):
+        pgn = open(pgnfn)
+        game = chess.pgn.read_game(pgn)
+        game_node = game
+        end_node = game_node.end()
+        end_board = end_node.board()
+
+        return end_board.fen()
 
     def search(self, fen, d, ply):
         """ Search and extend moves based from current pos """
@@ -190,43 +199,32 @@ class genbook():
 
     def save_book_lines(self, ply):
         """ Save lines in pgn format """
-        setup_tag_value = 0 if self.startpos == CHESS_STD_START_POS else 1
-        event_tag_value = 'White book lines generation'\
-                          if self.book_side == 'white'\
-                          else 'Black book lines generation'
-        if ply == self.depth:
-            print('\n --->>> book line: %d' % self.book_line)
+        if self.pgnfile is not None:
+            pgn = open(self.pgnfile)
+            game = chess.pgn.read_game(pgn)
+
+            game.headers['Annotator'] = self.analyzer
+            game.headers['TimeControl'] = '%d/%d' % (1, self.movetime / 1000)
+
+            game_node = game
+            end_node = game_node.end()
+            end_board = end_node.board()
+
             line_score = 0.0
-            with open(self.outfn, 'a') as f:
-                f.write('[Event "%s"]\n' % event_tag_value)
-                f.write('[Site "%s"]\n' % '?')
-                f.write('[Date "%s"]\n' % datetime.datetime.today().strftime('%Y.%m.%d'))
-                f.write('[Round "%s"]\n' % '?')
-                f.write('[White "%s"]\n' % '?')
-                f.write('[Black "%s"]\n' % '?')
-                f.write('[Result "%s"]\n' % '*')
-                if setup_tag_value == 1:
-                    f.write('[SetUp "%d"]\n' % setup_tag_value)
-                    f.write('[FEN "%s"]\n' % self.startpos)
-                f.write('[Annotator "%s"]\n' % self.analyzer)
-                f.write('[TimeControl "%d/%d"]\n\n' % (1, self.movetime/1000))
-            for n in self.pv:
+            for i, n in enumerate(self.pv):
                 line_score += n[3] + n[4]
-                if n[1]%2 == 0:
-                    with open(self.outfn, 'a') as f:
-                        f.write('%d. %s {rel_score: %0.2f, line_score: %0.2f} '\
-                                % ((n[1]+2)/2, n[2], n[3], line_score))
-                    sys.stdout.write('%d. %s {rel_score: %0.2f, line_score: %0.2f} '\
-                                     % ((n[1]+2)/2, n[2], n[3], line_score))
+                if i == 0:
+                    node = end_node.add_variation(end_board.parse_san(n[2]))
+                    node.comment = 'rel_score: %0.2f, line_score: %0.2f' % (
+                        n[3], line_score)
                 else:
-                    with open(self.outfn, 'a') as f:
-                        f.write('%d... %s {rel_score: %0.2f, line_score: %0.2f} '\
-                                % ((n[1]+2)/2, n[2], n[3], line_score))
-                    sys.stdout.write('%d... %s {rel_score: %0.2f, line_score: %0.2f} '\
-                                     % ((n[1]+2)/2, n[2], n[3], line_score))
-            print()
+                    node = node.add_variation(node.board().parse_san(n[2]))
+                    node.comment = 'rel_score: %0.2f, line_score: %0.2f' % (
+                        n[3], line_score)
+
             with open(self.outfn, 'a') as f:
-                f.write('*\n\n')
+                f.write('%s \n\n' % (game))
+
             self.book_line += 1
 
     def normalize_score(self, mv, ply, stm):
@@ -256,29 +254,31 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=APP_DESC, epilog=APP_NAME_VER)
     parser.add_argument("-e", "--engine", help="input engine name",
                         required=True)
-    parser.add_argument("-m", "--hash", help="engine hash usage in MB,\
-                        default=64MB", default=64, type=int)
-    parser.add_argument("-t", "--threads", help="engine threads to use,\
-                        default=1", default=1, type=int)
-    parser.add_argument("-d", "--depth", help="maximum depth of a book line,\
-                        default=4", default=4, type=int)
-    parser.add_argument("-a", "--movetime", help="analysis time per position\
-                        in ms, in multipv=n where n > 1, the analysis time\
-                        will be extended to n times this movetime,\
-                        default=1000", default=1000, type=int)
-    parser.add_argument("-f", "--wmultipv", help="number of pv for\
-                        white, default=1", default=1, type=int)
-    parser.add_argument("-g", "--bmultipv", help="number of pv for\
-                        black, default=1", default=1, type=int)
-    parser.add_argument("-b", "--bookside", help="white = book for white,\
-                        black = book for black, default=black",
-                        default='black')
-    parser.add_argument("-r", "--relminscore", help="minimum relative score that\
-                        a given move will be extended if this is high then\
-                        less book lines will be generated, default=-0.3",
+    parser.add_argument("--inpgn", help="input pgn file", required=True)
+    parser.add_argument("-m", "--hash", help="engine hash usage in MB, "
+                                             "default=64MB", default=64, type=int)
+    parser.add_argument("-t", "--threads", help="engine threads to use, "
+                                                "default=1", default=1, type=int)
+    parser.add_argument("-d", "--depth", help="maximum depth of a book line, "
+                        "default=4", default=4, type=int)
+    parser.add_argument("-a", "--movetime", help="analysis time per position "
+                        "in ms, in multipv=n where n > 1, the analysis time "
+                        "will be extended to n times this movetime, default=1000",
+                        default=1000, type=int)
+    parser.add_argument("-f", "--wmultipv", help="number of pv for white, "
+                        "default=1", default=1, type=int)
+    parser.add_argument("-g", "--bmultipv",
+                        help="number of pv for black, default=1",
+                        default=1, type=int)
+    parser.add_argument("-b", "--bookside",
+                        help="white=book for white, black=book for black, "
+                             "default=black", default='black')
+    parser.add_argument("-r", "--relminscore", help="minimum relative score "
+                        "that a given move will be extended if this is high "
+                        "then less book lines will be generated, default=-0.3",
                         default=-0.3, type=float)
-    parser.add_argument("-j", "--movepenalty", help="move penalty for the book\
-                        side, default=-0.1",
+    parser.add_argument("-j", "--movepenalty", help="move penalty for the "
+                                                    "book side, default=-0.1",
                         default=-0.1, type=float)
 
     args = parser.parse_args()
@@ -286,8 +286,6 @@ if __name__ == "__main__":
     ply = 0
     
     outfn = 'w_out.pgn' if args.bookside == 'white' else 'b_out.pgn'
-    
-    startpos = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'  # Std chess startpos
         
     data = {'engine':args.engine,
             'hash':args.hash,
@@ -296,10 +294,10 @@ if __name__ == "__main__":
             'bookside':args.bookside,
             'wmultipv':args.wmultipv,
             'bmultipv':args.bmultipv,
-            'startpos':startpos,
             'depth':args.depth,
             'mrs':args.relminscore,
             'movepenalty':args.movepenalty,
+            'pgnfile':args.inpgn,
             'output':outfn
             }
     
@@ -310,10 +308,9 @@ if __name__ == "__main__":
     print('Max ply                    : %d' % args.depth)
     print('Movetime (ms)              : %d' % args.movetime)
     print('Hash (mb)                  : %d' % args.hash)
-    print('Threads                    : %d' % args.threads)
-    print('startpos                   : %s\n' % startpos)
+    print('Threads                    : %d\n' % args.threads)
     
     a = genbook(data)
-    a.search(startpos, args.depth, ply)
+    end_fen = a.get_end_fen(args.inpgn)
+    a.search(end_fen, args.depth, ply)
 
-    
