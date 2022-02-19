@@ -1,0 +1,1 @@
+python booklet-writer.py --engine stockfish.exe --hash 128 --threads 1 --movetime 1000 --bmultipv 1 --wmultipv 4 --bookside black --inpgn sample.pgn
